@@ -1,0 +1,252 @@
+This repository contains a simple URL shortening service.
+
+* Instructions
+These instructions assume you have access to the following:
+- [ ] A UNIX-like operating system.
+- [ ] Docker
+- [ ] Go
+- [ ] Make
+
+Depending on your setup, your ~docker~ commands will likely require root privileges.
+
+If you know what you're doing, you should be able to run this service with Go alone.
+
+** Setup
+Clone the repository with ~git~:
+#+begin_src bash
+git clone github.com/dwrz/url-shortener
+#+end_src
+
+Setup a local MongoDB instance. The easiest way to spin this up is to run:
+#+begin_src bash
+docker run -d -v /tmp/url-shortener/data:/data/db -p 27017-27019:27017-27019 --name mongodb mongo:4.2
+#+end_src
+
+This will start MongoDB 4.2 in a Docker container, with data persisted to ~/tmp/url-shortener~.
+
+- You may specify another directory if you don't wish to use ~/tmp~.
+- You may specify another Mongo URI by setting the ~MONGO_URI~ environment variable before calling the service.
+- The service will use the ~ENV~ environment variable to specify which MongoDB database to use. By default, the service will create and use a ~development~ database.
+
+** Build
+Calling ~make~ or ~make build~ from the root directory should build the service.
+#+begin_src bash
+make
+#+end_src
+
+#+begin_src bash
+make build
+#+end_src
+
+** Run
+Ensure the ~mongodb~ container is running on Docker.
+
+~make run~ should start the service.
+#+begin_src bash
+make run
+#+end_src
+
+By default the service will run using port 8080. This may be configured with the ~PORT~ environment variable.
+
+** Test
+Run ~make test~ to run package tests and the ~test~ program.
+
+#+begin_src bash
+make test
+#+end_src
+
+You can also test the service with the race detector enabled:
+#+begin_src bash
+make test-race
+#+end_src
+
+** Cleanup
+~Ctrl-C~ or issuing a ~SIGINT~ or ~SIGTERM~ to the service's process should cause a graceful shutdown.
+
+~docker stop mongodb~ should stop the MongoDB container.
+~docker rm mongodb~ should remove the stopped container.
+~docker rmi mongo:4.2~ should remove the MongoDB image.
+
+You may want to manually remove the data in ~/tmp/url-shortener~.
+
+* API
+** Status
+The status endpoint is a simple health-check located at the ~/~ path. It should with an ~200 OK~ status and no body. There are no error responses on this endpoint.
+
+#+begin_src restclient
+GET http://localhost:8080/
+#+end_src
+
+#+begin_src bash
+curl -i -XGET http\://localhost\:8080/
+#+end_src
+
+#+RESULTS:
+#+BEGIN_SRC js
+// GET http://localhost:8080/
+// HTTP/1.1 200 OK
+// Date: Sun, 29 Mar 2020 01:34:02 GMT
+// Content-Length: 0
+// Request duration: 0.005236s
+#+END_SRC
+
+** Create a Short URL
+Make a ~POST~ request to the root path, with a ~Content-Type~ of ~application/x-www-form-urlencoded~. The body of the request should have a ~url~ field, whose value should be a valid URL to be shortened.
+
+The service should respond with a ~201 Created~ status code. The body should contain the plain text short URL string.
+
+#+begin_src restclient
+POST http://localhost:8080/
+Content-Type: application/x-www-form-urlencoded
+
+url=http://trillionthtonne.org/
+#+end_src
+
+#+begin_src bash
+curl -i -H Content-Type\:\ application/x-www-form-urlencoded -XPOST http\://localhost\:8080/ -d url\=http\://trillionthtonne.org/
+#+end_src
+
+#+RESULTS:
+#+BEGIN_SRC text
+r5eDKFBgv
+POST http://localhost:8080
+HTTP/1.1 201 Created
+Date: Sun, 29 Mar 2020 01:21:33 GMT
+Content-Length: 8
+Content-Type: text/plain; charset=utf-8
+Request duration: 0.008523s
+#+END_SRC
+
+The service may respond with a ~400 Bad Request~ status, and a body of ~invalid url~, if a malformed URL is submitted.
+
+It may return a ~500 Internal Server Error~ status, and a body of ~server error~, if the server encounters an error while generating the short URL, or persisting data to MongoDB.
+
+** Redirect
+To retrieve a URL with a short URL, make a ~GET~ with the short URL as a path parameter:
+
+#+begin_src restclient
+GET http://localhost:8080/Hz2Et7JO
+#+end_src
+
+#+begin_src bash
+curl -i -XGET http\://localhost\:8080/Hz2Et7JO
+#+end_src
+
+#+RESULTS:
+#+BEGIN_SRC js
+// GET http://localhost:8080/Hz2Et7JO
+// HTTP/1.1 200 OK
+// Date: Sun, 29 Mar 2020 01:39:18 GMT
+// Content-Length: 0
+// Request duration: 0.009923s
+#+END_SRC
+
+The service may respond with a ~404 Not Found~ status, and a body of ~not found~, if no document for the short URL is found.
+
+It may return a ~500 Internal Server Error~ status, and a body of ~server error~, if an error is encountered while persisting a short URL visit to the DB.
+
+** Stats
+To retrieve statistics on visits to a short URL, make a ~GET~ with the short URL as a path parameter, followed by ~/stats~. A ~JSON~ object is returned in the response body.
+
+#+begin_src restclient
+GET http://localhost:8080/r5eDKFBg/stats
+#+end_src
+
+#+begin_src bash
+curl -i -XGET http\://localhost\:8080/r5eDKFBg/stats
+#+end_src
+
+#+RESULTS:
+#+BEGIN_SRC js
+{
+  "day": 1,
+  "week": 11,
+  "year": 111
+}
+// GET http://localhost:8080/r5eDKFBg/stats
+// HTTP/1.1 200 OK
+// Content-Type: application/json
+// Date: Sun, 29 Mar 2020 01:41:16 GMT
+// Content-Length: 28
+// Request duration: 0.010410s
+#+END_SRC
+
+The service may respond with a ~404 Not Found~ status, and a body of ~not found~, if no document for the short URL is found.
+
+It may return a ~500 Internal Server Error~ status, and a body of ~server error~, if an error is encountered while aggregating statistics for the short URL.
+
+* Background
+** Requirements
+- Build an HTTP-based RESTful API for managing short URLs and redirecting clients. The API must offer the following features:
+  - Generate a short URL from a long URL.
+  - Redirect a short URL to a long URL within 10ms.
+  - List the number of times a short URL has been accessed:
+    - In the last 24 hours.
+    - In the last week.
+    - All time.
+- No authentication is required.
+- No HTML or web UI is required.
+- Free choice of transport and serialization.
+- Anything unspecified is left to discretion.
+
+** Constraints
++ Short URLs
+  - Are unique to one long URL. If an identical long URL is added twice, two short URLs should be generated.
+  - Are permanent.
+  - Are not easily discoverable; e.g., incrementing an existing short URL should have a low probability of yielding another working short URL.
+
++ The service:
+  - Must support millions of URLs.
+  - Must persist data.
+  - Must be testable with ~curl~.
+
+* Analysis and Assumptions
+We need a sufficiently long short URL to allow for the creation of millions of URLs.
+
+With a 62 character charset and a short URL of length 6, we get 5,680,0235,584 possible short URLs. With a length of 8, we get 218,340,105,584,896 permutations.
+
+However, the [[https://en.wikipedia.org/wiki/Birthday_problem][birthday problem]] means that the possibility of a collision is more than 1 over 5,680,0235,584. At 1000 requests per hour, there is a 1% probability of collision every day. See: https://alex7kom.github.io/nano-nanoid-cc/?alphabet=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz&size=6&speed=1000&speedUnit=hour.
+
+There is also tension between generating user friendly short URLs and limiting potential collisions. Reducing the length and character set of short URLs might be preferable for the user, but would result in more collisions. Vice-versa, using UUIDs would result in decreased collisions, but would present a poor user experience.
+
+Assumptions:
+- A typical load of 1000 requests per hour.
+- A properly configured MongoDB database that responds within the context timeouts set in the service.
+- Emphasis on useability -- i.e., don't return UUIDs.
+
+* TODO
+#+begin_quote
+Un ouvrage n’est jamais achevé . . . mais abandonné.
+
+A work is never completed, only abandoned.
+
+-- Paul Valéry, La Nouvelle Revue Française
+#+end_quote
+
+These are some of the things I would improve if I had more time, or knowledge of the production context of this service:
+
+- Configuration
+- Deployment
+- Environment
+- Database
+  - Index the short URL field.
+- Documentation
+  - Both high level, and within the source.
+- Error Handling
+- Logging and Observability
+- Performance
+  - Caching URLs; using Redis, especially to speed up retrieving long URLs for redirection.
+  - Generating an adequate length short URL.
+  - Merging the Find and Aggregation in the statistics endpoint.
+- Persisting Visits
+  - This can be done asynchronously to the redirect.
+- Security
+  - Authentication and private URLs.
+  - Preventing recursive URLs.
+  - Rate limiting.
+- Testing
+  - Use an interface for DB operations, to use a mock DB.
+  - Separate functionality in the test program into package level tests.
+  - Test more edge cases.
+- Validation
+  - Implement stricter URL validation.
