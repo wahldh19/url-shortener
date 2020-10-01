@@ -23,7 +23,6 @@ func (p UrlParams) validate() error {
 	if p.Query == "" {
 		return fmt.Errorf("missing Query")
 	}
-
 	return nil
 }
 
