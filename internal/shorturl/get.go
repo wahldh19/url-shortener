@@ -3,7 +3,6 @@ package shorturl
 import (
 	"context"
 	"fmt"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -30,11 +29,13 @@ func (p GetParams) validate() error {
 
 // Get retrieves a short URL document from the database.
 func Get(ctx context.Context, p GetParams) (short *ShortURL, err error) {
+
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("invalid params: %v", err)
 	}
 
 	coll := p.DB.Database(p.Environment).Collection(Collection)
+
 	findContext, cancel := context.WithTimeout(ctx, findTimeout)
 	defer cancel()
 

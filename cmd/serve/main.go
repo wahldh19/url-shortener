@@ -12,6 +12,7 @@ import (
 )
 
 func main() {
+
 	log.Println("starting")
 
 	// Get the service configuration.

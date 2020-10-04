@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"fmt"
-	"net/http"
-
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
+	"net/http"
 )
 
 const (
@@ -56,7 +55,10 @@ func AddRoutes(p AddRoutesParams) error {
 	}
 
 	// Add the status handler.
-	p.Router.HandleFunc(pathStatus, status).Methods(http.MethodGet)
+	p.Router.HandleFunc(
+		pathStatus,
+		handler{db: p.DB, environment: p.Environment}.Status,
+	).Methods(http.MethodGet)
 
 	// Add the create handler.
 	p.Router.HandleFunc(
