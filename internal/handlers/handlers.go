@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
-	"strings"
 )
 
 // handler is used to store values needed by methods implementing the
@@ -129,12 +128,9 @@ func (h handler) Stats(w http.ResponseWriter, r *http.Request) {
 func (h handler) Status(w http.ResponseWriter, r *http.Request) {
 	stats, ok := r.URL.Query()["stats"]
 
-	str2 := strings.Join(stats, " ")
-
-	shortURLCount, err := shorturl.GetUrlCount(r.Context(), shorturl.UrlParams{
+	shortURLCount, err := shorturl.GetUrlCount(r.Context(), shorturl.URLParams{
 		DB:          h.db,
 		Environment: h.environment,
-		Query:       str2,
 	})
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -146,14 +142,15 @@ func (h handler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type response struct {
-		ShortUrlCount int64
-	}
-
-	s := response{ShortUrlCount: shortURLCount}
-
 	stat := stats[0]
+
 	if string(stat) == "true" {
+
+		type response struct {
+			ShortUrlCount int64
+		}
+
+		s := response{ShortUrlCount: shortURLCount}
 
 		j, err := json.Marshal(s)
 		if err != nil {

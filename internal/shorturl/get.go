@@ -29,7 +29,6 @@ func (p GetParams) validate() error {
 
 // Get retrieves a short URL document from the database.
 func Get(ctx context.Context, p GetParams) (short *ShortURL, err error) {
-
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("invalid params: %v", err)
 	}
