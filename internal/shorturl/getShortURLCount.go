@@ -24,10 +24,11 @@ func (p URLParams) validate() error {
 	return nil
 }
 
-func GetUrlCount(ctx context.Context, p URLParams) (URLCount int64, err error) {
+func GetURLCount(ctx context.Context, p URLParams) (URLCount int64, err error) {
 	if err := p.validate(); err != nil {
 		return 0, fmt.Errorf("invalid params: %v", err)
 	}
+
 	URLCount, err = p.DB.Database(p.Environment).Collection(Collection).CountDocuments(ctx, bson.D{}, nil)
 	if err != nil {
 		log.Print("Error: ", err)

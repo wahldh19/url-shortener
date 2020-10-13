@@ -128,40 +128,41 @@ func (h handler) Stats(w http.ResponseWriter, r *http.Request) {
 func (h handler) Status(w http.ResponseWriter, r *http.Request) {
 	stats, ok := r.URL.Query()["stats"]
 
-	shortURLCount, err := shorturl.GetUrlCount(r.Context(), shorturl.URLParams{
-		DB:          h.db,
-		Environment: h.environment,
-	})
-	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-
 	if !ok || len(stats[0]) < 1 {
-		log.Println("Url Param 'stats' is missing")
+		log.Println("URL Param 'stats' is missing")
 		return
 	}
 
 	stat := stats[0]
+	stat = string(stat)
 
-	if string(stat) == "true" {
+	switch {
 
-		type response struct {
-			ShortUrlCount int64
-		}
-
-		s := response{ShortUrlCount: shortURLCount}
-
-		j, err := json.Marshal(s)
+	case stat == "true":
+		shortURLCount, err := shorturl.GetURLCount(r.Context(), shorturl.URLParams{
+			DB:          h.db,
+			Environment: h.environment,
+		})
 		if err != nil {
-			panic(err)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
+		response := struct {
+			ShortURLCount int64 `json:"shorturlcount"`
+		}{ShortURLCount: shortURLCount}
 
+		j, err := json.Marshal(response.ShortURLCount)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(j))
+
+	default:
+		w.Write([]byte{})
 	}
 
-	w.Write([]byte{})
 }
