@@ -126,43 +126,39 @@ func (h handler) Stats(w http.ResponseWriter, r *http.Request) {
 // status is used as a health check for this service.
 // It should respond with a 200 HTTP Status OK and an empty body.
 func (h handler) Status(w http.ResponseWriter, r *http.Request) {
-	stats, ok := r.URL.Query()["stats"]
+	queryParams := r.URL.Query()
+	stats, ok := queryParams["stats"]
+	if ok && len(stats) > 0 {
+		stat := stats[0]
+		switch {
+		case stat == "true":
+			shortURLCount, err := shorturl.CountURLs(r.Context(), shorturl.CountParams{
+				DB:          h.db,
+				Environment: h.environment,
+			})
+			if err != nil {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
 
-	if !ok || len(stats[0]) < 1 {
-		log.Println("URL Param 'stats' is missing")
-		return
-	}
+			response := struct {
+				ShortURLCount int64 `json: ShortURLCount`
+			}{ShortURLCount: shortURLCount}
+			j, err := json.Marshal(response)
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
 
-	stat := stats[0]
-	stat = string(stat)
-
-	switch {
-
-	case stat == "true":
-		shortURLCount, err := shorturl.GetURLCount(r.Context(), shorturl.URLParams{
-			DB:          h.db,
-			Environment: h.environment,
-		})
-		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(j)
+		default:
+			w.Write([]byte{})
 		}
-
-		response := struct {
-			ShortURLCount int64 `json:"shorturlcount"`
-		}{ShortURLCount: shortURLCount}
-
-		j, err := json.Marshal(response.ShortURLCount)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(j))
-
-	default:
+	} else if !ok && len(queryParams) > 0 {
+		w.Write([]byte("Expected at most one query params: `stats`"))
+	} else {
 		w.Write([]byte{})
 	}
-
 }

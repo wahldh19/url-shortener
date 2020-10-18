@@ -3,18 +3,17 @@ package shorturl
 import (
 	"context"
 	"fmt"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
-	"os"
 )
 
-type URLParams struct {
+type CountParams struct {
 	DB          *mongo.Client
 	Environment string
 }
 
-func (p URLParams) validate() error {
+func (p CountParams) validate() error {
 	if p.DB == nil {
 		return fmt.Errorf("missing db client")
 	}
@@ -24,15 +23,17 @@ func (p URLParams) validate() error {
 	return nil
 }
 
-func GetURLCount(ctx context.Context, p URLParams) (URLCount int64, err error) {
+func CountURLs(ctx context.Context, p CountParams) (count int64, err error) {
 	if err := p.validate(); err != nil {
 		return 0, fmt.Errorf("invalid params: %v", err)
 	}
 
-	URLCount, err = p.DB.Database(p.Environment).Collection(Collection).CountDocuments(ctx, bson.D{}, nil)
+	count, err = p.DB.Database(
+		p.Environment,
+	).Collection(Collection).CountDocuments(ctx, bson.D{}, nil)
 	if err != nil {
-		log.Print("Error: ", err)
-		os.Exit(1)
+		return 0, fmt.Errorf("failed to count documents: %v", err)
 	}
-	return URLCount, nil
+
+	return count, nil
 }
