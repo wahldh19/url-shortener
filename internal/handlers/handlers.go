@@ -126,39 +126,35 @@ func (h handler) Stats(w http.ResponseWriter, r *http.Request) {
 // status is used as a health check for this service.
 // It should respond with a 200 HTTP Status OK and an empty body.
 func (h handler) Status(w http.ResponseWriter, r *http.Request) {
-	queryParams := r.URL.Query()
-	stats, ok := queryParams["stats"]
-	if ok && len(stats) > 0 {
-		stat := stats[0]
-		switch {
-		case stat == "true":
-			shortURLCount, err := shorturl.CountURLs(r.Context(), shorturl.CountParams{
+	switch {
+	case r.URL.Query().Get("stats") == "true":
+		shortURLCount, err := shorturl.CountURLs(
+			r.Context(), shorturl.CountParams{
 				DB:          h.db,
 				Environment: h.environment,
-			})
-			if err != nil {
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-
-			response := struct {
-				ShortURLCount int64 `json: ShortURLCount`
-			}{ShortURLCount: shortURLCount}
-			j, err := json.Marshal(response)
-			if err != nil {
-				http.Error(w, err.Error(), 500)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(j)
-		default:
-			w.Write([]byte{})
+			},
+		)
+		if err != nil {
+			http.Error(
+				w, err.Error(), http.StatusInternalServerError,
+			)
+			return
 		}
-	} else if !ok && len(queryParams) > 0 {
-		w.Write([]byte("Expected at most one query params: `stats`"))
-	} else {
+		response := struct {
+			ShortURLCount int64 `json:"shortURLCount"`
+		}{ShortURLCount: shortURLCount}
+		j, err := json.Marshal(response)
+		if err != nil {
+			http.Error(
+				w, err.Error(), http.StatusInternalServerError,
+			)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(j)
+	default:
 		w.Write([]byte{})
 	}
 }
